@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通話録音 & 文字起こしツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f7f4;
+    --bg2: #f0ede8;
+    --bg3: #ffffff;
+    --text: #1a1a18;
+    --text2: #6b6860;
+    --text3: #a09d98;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --blue: #185FA5;
+    --blue-light: #E6F1FB;
+    --blue-mid: #378ADD;
+    --red: #D85A30;
+    --red-dark: #993C1D;
+    --green: #1D9E75;
+    --green-light: #E1F5EE;
+    --green-dark: #0F6E56;
+    --amber: #B45309;
+    --amber-light: #FEF3C7;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1918;
+      --bg2: #222120;
+      --bg3: #2a2927;
+      --text: #f0ede8;
+      --text2: #a09d98;
+      --text3: #6b6860;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.18);
+      --blue-light: #0c2a45;
+      --green-light: #042f20;
+      --amber-light: #2d1f00;
+    }
+  }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .app { width: 100%; max-width: 640px; }
+
+  /* ── 免責モーダル ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .modal {
+    background: var(--bg3);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+
+  .modal-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--amber-light);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--amber);
+    margin-bottom: 1rem;
+  }
+
+  .modal-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .modal-body {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-body strong { color: var(--text); font-weight: 500; }
+
+  .modal-body ul {
+    margin: 0.5rem 0 0.5rem 1.2rem;
+  }
+
+  .modal-body li { margin-bottom: 4px; }
+
+  .modal-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--bg2);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+  }
+
+  .modal-check input[type="checkbox"] {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--blue);
+  }
+
+  .modal-check label {
+    font-size: 13px;
+    line-height: 1.6;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .btn-agree {
+    width: 100%;
+    padding: 12px;
+    background: var(--blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+
+  .btn-agree:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-agree:not(:disabled):hover { background: #0C447C; }
+
+  /* ── メインUI ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 1.5rem;
+  }
+
+  .header-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--bg3);
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: var(--text2);
+  }
+
+  .title { font-size: 20px; font-weight: 500; }
+  .subtitle { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  .version-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text3);
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: 99px;
+    padding: 3px 10px;
+  }
+
+  .disclaimer-bar {
+    background: var(--amber-light);
+    border: 0.5px solid rgba(180,83,9,0.2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--amber);
+    margin-bottom: 1.25rem;
+    line-height: 1.6;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .disclaimer-bar i { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  .notice {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-left: 2.5px solid var(--blue-mid);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 1.25rem;
+    line-height: 1.7;
+  }
+
+  .notice strong { color: var(--text); font-weight: 500; }
+
+  .source-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+
+  .source-card {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+
+  .source-card.active {
+    border: 1.5px solid var(--blue-mid);
+    background: var(--blue-light);
+  }
+
+  .source-card .s-label {
+    font-size: 12px;
+    color: var(--text3);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .source-card.active .s-label { color: var(--blue); }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border2);
+    display: inline-block;
+    transition: background 0.15s;
+  }
+
+  .source-card.active .dot { background: var(--green); }
+  .source-card .s-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .source-card.active .s-name { color: #0C447C; }
+
+  .lang-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+
+  .lang-row label { font-size: 13px; color: var(--text2); white-space: nowrap; }
+
+  select {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg3);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .rec-area {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 40px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 1rem;
+    letter-spacing: -1px;
+    color: var(--text);
+    transition: color 0.2s;
+  }
+
+  .timer.recording { color: var(--red); }
+
+  .waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 44px;
+    margin-bottom: 1.25rem;
+  }
+
+  .bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--border2);
+    height: 6px;
+    transition: height 0.08s ease;
+  }
+
+  .bar.active { background: var(--red); }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .btn-rec {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    background: var(--red);
+    color: white;
+    transition: transform 0.1s, background 0.15s;
+    box-shadow: 0 2px 12px rgba(216,90,48,0.3);
+  }
+
+  .btn-rec:hover { transform: scale(1.05); }
+  .btn-rec:active { transform: scale(0.96); }
+  .btn-rec.recording { background: var(--red-dark); box-shadow: none; }
+
+  .btn-ctrl {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    background: var(--bg3);
+    color: var(--text2);
+    transition: transform 0.1s, background 0.15s;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .btn-ctrl:hover { background: var(--bg2); }
+  .btn-ctrl:active { transform: scale(0.96); }
+  .btn-ctrl:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .status-msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text3);
+    text-align: center;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  .status-msg.error { color: var(--red); }
+  .status-msg.success { color: var(--green); }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  .transcript-box {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    min-height: 130px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .placeholder { color: var(--text3); font-style: italic; font-size: 13px; }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg3);
+    color: var(--text2);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .btn-action:hover { background: var(--bg2); color: var(--text); }
+  .btn-action:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-action i { font-size: 15px; }
+
+  .btn-primary {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+  }
+
+  .btn-primary:hover { background: #0C447C; color: white; }
+
+  hr.divider {
+    border: none;
+    border-top: 0.5px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  .recordings-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .rec-item {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rec-item-info { flex: 1; min-width: 0; }
+  .rec-item-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-item-meta { font-size: 12px; color: var(--text3); }
+  .tx-has { color: var(--green-dark); }
+  .rec-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border);
+    background: var(--bg2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--text2);
+    transition: background 0.12s;
+  }
+
+  .icon-btn:hover { background: var(--bg3); color: var(--text); }
+
+  .empty-state {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--text3);
+    font-size: 13px;
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .gain-panel {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gain-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .gain-icon {
+    font-size: 16px;
+    color: var(--text3);
+    width: 18px;
+    flex-shrink: 0;
+  }
+
+  .gain-label {
+    font-size: 12px;
+    color: var(--text2);
+    width: 110px;
+    flex-shrink: 0;
+  }
+
+  .gain-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--blue);
+    cursor: pointer;
+    height: 4px;
+  }
+
+  .gain-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--blue);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .gain-hint {
+    font-size: 11px;
+    color: var(--text3);
+    padding-top: 2px;
+  }
+
+  .footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.8;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- 免責モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-icon"><i class="ti ti-shield-check"></i></div>
+    <div class="modal-title">ご利用前に必ずお読みください</div>
+    <div class="modal-body">
+      本ツールをご利用いただく前に、以下の事項をご確認ください。
+      <ul>
+        <li>日本では、<strong>通話相手の同意なしに録音することは、プライバシーの侵害となる可能性</strong>があります。</li>
+        <li>ビジネス利用の場合は、録音する旨を相手に事前に伝えてください。</li>
+        <li>LINEなど各サービスの利用規約をご確認の上、ご使用ください。</li>
+        <li>本ツールの使用により生じたいかなる損害についても、開発者は責任を負いません。</li>
+      </ul>
+    </div>
+    <div class="modal-check" onclick="toggleCheck()">
+      <input type="checkbox" id="agree-check" onchange="toggleAgree()">
+      <label for="agree-check">上記の内容を理解し、<strong>通話相手の同意を得た上で</strong>使用することに同意します。</label>
+    </div>
+    <button class="btn-agree" id="btn-agree" disabled onclick="closeModal()">同意してツールを開始する</button>
+  </div>
+</div>
+
+<!-- メインUI -->
+<div class="app" id="main-app" style="opacity:0;pointer-events:none;">
+
+  <div class="header">
+    <div class="header-icon"><i class="ti ti-microphone-2"></i></div>
+    <div>
+      <div class="title">通話録音ツール</div>
+      <div class="subtitle">Mac / Windows · Chrome対応</div>
+    </div>
+    <span class="version-badge">v3.0</span>
+  </div>
+
+  <div class="disclaimer-bar">
+    <i class="ti ti-alert-triangle"></i>
+    <span>本ツールの使用にあたっては、必ず通話相手の同意を得てください。録音に関する法的責任はご利用者が負うものとします。</span>
+  </div>
+
+  <div class="notice">
+    <strong>対応アプリ（Mac / Windows デスクトップ版）</strong><br>
+    RakutenLink Office・LINE・Apple純正通話・Zoom・Teams・Meet 等<br><br>
+    ① デスクトップ版アプリで通話を開始<br>
+    ② 「システム音声」を有効にして録音ボタンを押す<br>
+    ③ 画面共有ダイアログで <strong>「システム音声を含む」にチェック</strong> して許可<br>
+    ④ 自分の声（マイク）＋相手の声（システム音声）を同時録音
+  </div>
+
+  <div class="source-grid">
+    <div class="source-card active" id="card-mic" onclick="toggleSource('mic')">
+      <div class="s-label"><span class="dot" id="dot-mic" style="background:var(--green)"></span>マイク入力</div>
+      <div class="s-name"><i class="ti ti-microphone" style="font-size:13px;margin-right:4px;"></i>内蔵マイク（自分の声）</div>
+    </div>
+    <div class="source-card" id="card-sys" onclick="toggleSource('sys')">
+      <div class="s-label"><span class="dot" id="dot-sys"></span>システム音声</div>
+      <div class="s-name"><i class="ti ti-speakerphone" style="font-size:13px;margin-right:4px;"></i>画面共有経由（相手の声）</div>
+    </div>
+  </div>
+
+  <div class="gain-panel">
+    <div class="gain-row">
+      <i class="ti ti-microphone gain-icon"></i>
+      <label class="gain-label">自分の声 ゲイン</label>
+      <input type="range" id="gain-mic" min="1" max="5" step="0.1" value="1" oninput="updateGain('mic')">
+      <span class="gain-val" id="gain-mic-val">×1.0</span>
+    </div>
+    <div class="gain-row">
+      <i class="ti ti-speakerphone gain-icon"></i>
+      <label class="gain-label">相手の声 ゲイン</label>
+      <input type="range" id="gain-sys" min="1" max="8" step="0.1" value="3" oninput="updateGain('sys')">
+      <span class="gain-val" id="gain-sys-val">×3.0</span>
+    </div>
+    <div class="gain-hint">相手の声が小さい場合は「相手の声ゲイン」を上げてください</div>
+  </div>
+
+  <div class="rec-area">
+    <div class="timer" id="timer">00:00</div>
+    <div class="waveform" id="waveform"></div>
+    <div class="controls">
+      <button class="btn-ctrl" id="btn-stop" disabled onclick="stopRecording()" title="停止">
+        <i class="ti ti-player-stop"></i>
+      </button>
+      <button class="btn-rec" id="btn-rec" onclick="toggleRecording()" title="録音開始">
+        <i class="ti ti-microphone" id="rec-icon"></i>
+      </button>
+      <button class="btn-ctrl" id="btn-pause" disabled onclick="togglePause()" title="一時停止">
+        <i class="ti ti-player-pause" id="pause-icon"></i>
+      </button>
+    </div>
+    <div class="status-msg" id="status-msg">録音ボタンを押してください</div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-action" id="btn-diag" onclick="diagnoseMic()">
+      <i class="ti ti-stethoscope"></i> マイク診断
+    </button>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label" style="margin-bottom:12px;">録音済みファイル</div>
+  <div class="recordings-list" id="recordings-list">
+    <div class="empty-state">録音がまだありません</div>
+  </div>
+
+  <div class="footer">
+    通話録音ツール v3.0　｜　Mac / Windows 対応　｜　Chrome推奨<br>
+    ⚠️ 本ツールの使用により生じた損害について開発者は一切の責任を負いません。<br>
+    通話の録音は必ず相手の同意を得た上で行ってください。
+  </div>
+
+</div>
+
+<script>
+  // モーダル
+  function toggleCheck() {
+    const cb = document.getElementById('agree-check');
+    cb.checked = !cb.checked;
+    toggleAgree();
+  }
+  function toggleAgree() {
+    document.getElementById('btn-agree').disabled = !document.getElementById('agree-check').checked;
+  }
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+    const app = document.getElementById('main-app');
+    app.style.opacity = '1';
+    app.style.pointerEvents = 'auto';
+    app.style.transition = 'opacity 0.3s';
+  }
+
+  // アプリ本体
+  let isRecording = false, isPaused = false;
+  let mediaRecorder = null, audioChunks = [];
+  let timerInterval = null, startTime = null, pausedTime = 0, pauseStart = null;
+  let recordings = [], sources = { mic: true, sys: false };
+  let micStream = null, sysStream = null, audioContext = null, analyser = null, animFrame = null;
+  let gainNodeMic = null, gainNodeSys = null;
+
+  function updateGain(type) {
+    const val = parseFloat(document.getElementById('gain-' + type).value);
+    document.getElementById('gain-' + type + '-val').textContent = '×' + val.toFixed(1);
+    if (type === 'mic' && gainNodeMic) gainNodeMic.gain.value = val;
+    if (type === 'sys' && gainNodeSys) gainNodeSys.gain.value = val;
+  }
+
+  const waveform = document.getElementById('waveform');
+  for (let i = 0; i < 30; i++) {
+    const b = document.createElement('div'); b.className = 'bar'; waveform.appendChild(b);
+  }
+
+  function toggleSource(src) {
+    sources[src] = !sources[src];
+    document.getElementById('card-' + src).classList.toggle('active', sources[src]);
+    document.getElementById('dot-' + src).style.background = sources[src] ? 'var(--green)' : 'var(--border2)';
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.className = 'status-msg' + (type ? ' ' + type : '');
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function getElapsed() { return startTime ? Math.floor((Date.now() - startTime - pausedTime) / 1000) : 0; }
+  function updateTimer() { const e = getElapsed(); document.getElementById('timer').textContent = pad(Math.floor(e/60)) + ':' + pad(e%60); }
+
+  async function toggleRecording() { isRecording ? stopRecording() : await startRecording(); }
+
+  // ストリーム取得（初回のみ・再利用する）
+  async function acquireStreams() {
+    // マイク：まだ取得していないか、トラックが終了していたら再取得
+    if (sources.mic && (!micStream || micStream.getTracks().some(t => t.readyState === 'ended'))) {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, sampleRate: 48000 },
+        video: false
+      });
+    }
+    // システム音声：毎回ユーザー操作が必要なので再取得（ただし前のを先に止める）
+    if (sources.sys) {
+      if (sysStream) { sysStream.getTracks().forEach(t => t.stop()); sysStream = null; }
+      sysStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 1 },
+        audio: { echoCancellation: false, noiseSuppression: false, sampleRate: 48000, suppressLocalAudioPlayback: false }
+      });
+      if (sysStream.getAudioTracks().length === 0) {
+        setStatus('⚠️ 「システム音声を含む」にチェックが必要です', 'error');
+      }
+    }
+  }
+
+  async function startRecording() {
+    // 二重起動ガード
+    if (isRecording) return;
+
+    try {
+      setStatus('準備中...', '');
+      document.getElementById('btn-rec').disabled = true;
+
+      await acquireStreams();
+
+      const streams = [];
+      if (micStream && sources.mic) streams.push({ stream: micStream, isSys: false });
+      if (sysStream && sources.sys && sysStream.getAudioTracks().length > 0) streams.push({ stream: sysStream, isSys: true });
+
+      if (streams.length === 0) {
+        setStatus('音源を1つ以上有効にしてください', 'error');
+        document.getElementById('btn-rec').disabled = false;
+        return;
+      }
+
+      // AudioContext構築（前のものがあれば閉じる）
+      if (audioContext) { try { await audioContext.close(); } catch(e){} audioContext = null; }
+      audioContext = new AudioContext({ sampleRate: 48000 });
+      const dest = audioContext.createMediaStreamDestination();
+      analyser = audioContext.createAnalyser(); analyser.fftSize = 64;
+      gainNodeMic = null; gainNodeSys = null;
+
+      const micGainVal = parseFloat(document.getElementById('gain-mic').value);
+      const sysGainVal = parseFloat(document.getElementById('gain-sys').value);
+
+      for (const { stream, isSys } of streams) {
+        const src = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = isSys ? sysGainVal : micGainVal;
+        if (isSys) gainNodeSys = gainNode; else gainNodeMic = gainNode;
+        src.connect(gainNode);
+        gainNode.connect(dest);
+        gainNode.connect(analyser);
+      }
+
+      // MediaRecorder
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+      mediaRecorder = new MediaRecorder(dest.stream, mimeType ? { mimeType } : {});
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => { if (e.data?.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = finalizeRecording;
+      mediaRecorder.start(200);
+
+      // sysStreamが外部操作（共有停止ボタン等）で終了した場合の検出
+      if (sysStream) {
+        sysStream.getVideoTracks().forEach(t => {
+          t.onended = () => {
+            if (isRecording) {
+              setStatus('⚠️ 画面共有が終了しました。録音を停止します。', 'error');
+              stopRecording();
+            }
+          };
+        });
+      }
+
+      isRecording = true; isPaused = false;
+      startTime = Date.now(); pausedTime = 0;
+      timerInterval = setInterval(updateTimer, 500);
+      document.getElementById('timer').classList.add('recording');
+      document.getElementById('btn-rec').classList.add('recording');
+      document.getElementById('btn-rec').disabled = false;
+      document.getElementById('rec-icon').className = 'ti ti-player-pause';
+      document.getElementById('btn-stop').disabled = false;
+      document.getElementById('btn-pause').disabled = false;
+      animateBars();
+      setStatus('録音中...', '');
+
+    } catch(err) {
+      document.getElementById('btn-rec').disabled = false;
+      if (err.name === 'NotAllowedError') {
+        setStatus('マイク/画面共有の許可が必要です。許可してから再度押してください。', 'error');
+      } else if (err.name === 'NotFoundError') {
+        setStatus('マイクが見つかりません。接続を確認してください。', 'error');
+      } else {
+        setStatus('エラー: ' + err.message, 'error');
+      }
+    }
+  }
+
+  function animateBars() {
+    if (!analyser || !isRecording || isPaused) { waveform.querySelectorAll('.bar').forEach(b => { b.style.height='6px'; b.classList.remove('active'); }); return; }
+    const data = new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(data);
+    waveform.querySelectorAll('.bar').forEach((bar, i) => { const h = Math.max(4,(data[Math.floor(i*data.length/30)]/255)*38); bar.style.height=h+'px'; bar.classList.add('active'); });
+    animFrame = requestAnimationFrame(animateBars);
+  }
+
+  function togglePause() {
+    if (!isRecording) return;
+    if (!isPaused) {
+      isPaused = true; pauseStart = Date.now();
+      if (mediaRecorder?.state === 'recording') mediaRecorder.pause();
+      clearInterval(timerInterval);
+      document.getElementById('pause-icon').className = 'ti ti-player-play';
+      document.getElementById('btn-rec').style.opacity = '0.5';
+      waveform.querySelectorAll('.bar').forEach(b => { b.style.height='6px'; b.classList.remove('active'); });
+      setStatus('一時停止中', '');
+    } else {
+      isPaused = false; pausedTime += Date.now() - pauseStart;
+      if (mediaRecorder?.state === 'paused') mediaRecorder.resume();
+      timerInterval = setInterval(updateTimer, 500);
+      document.getElementById('pause-icon').className = 'ti ti-player-pause';
+      document.getElementById('btn-rec').style.opacity = '1';
+      animateBars();
+      setStatus('録音中...', '');
+    }
+  }
+
+  function stopRecording() {
+    if (!isRecording) return;
+
+    // まず録音フラグを下ろしてそれ以上の処理を防ぐ
+    isRecording = false;
+    isPaused = false;
+
+    // タイマー・アニメ停止
+    clearInterval(timerInterval);
+    timerInterval = null;
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+
+    // MediaRecorder停止（onstopでfinalizeRecordingが呼ばれる）
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch(e){}
+    }
+    mediaRecorder = null;
+
+    // マイクストリームはページを閉じるまで保持（再録音時に再取得不要にする）
+    // ただしシステム音声は毎回終了する
+    if (sysStream) { sysStream.getTracks().forEach(t => t.stop()); sysStream = null; }
+
+    // UI更新
+    document.getElementById('timer').classList.remove('recording');
+    document.getElementById('btn-rec').classList.remove('recording');
+    document.getElementById('btn-rec').style.opacity = '1';
+    document.getElementById('btn-rec').disabled = false;
+    document.getElementById('rec-icon').className = 'ti ti-microphone';
+    document.getElementById('btn-stop').disabled = true;
+    document.getElementById('btn-pause').disabled = true;
+    document.getElementById('pause-icon').className = 'ti ti-player-pause';
+    waveform.querySelectorAll('.bar').forEach(b => { b.style.height = '6px'; b.classList.remove('active'); });
+    setStatus('処理中...', '');
+  }
+
+  function finalizeRecording() {
+    const elapsed = getElapsed();
+    const dur = pad(Math.floor(elapsed/60)) + ':' + pad(elapsed%60);
+    const mimeType = audioChunks[0]?.type || 'audio/webm';
+    const blob = new Blob(audioChunks, { type: mimeType });
+    const now = new Date();
+    const dateStr = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+'_'+pad(now.getHours())+'-'+pad(now.getMinutes());
+    const rec = { blob, name:'録音_'+dateStr, dur, url: URL.createObjectURL(blob), mimeType };
+    recordings.unshift(rec); renderRecordings();
+    if (audioContext) { audioContext.close(); audioContext = null; }
+    setStatus('録音完了 (' + dur + ')', 'success');
+  }
+
+  // マイク診断
+  async function diagnoseMic() {
+    const btn = document.getElementById('btn-diag');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader"></i> 診断中...';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const ctx = new AudioContext();
+      const analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 256;
+      const src = ctx.createMediaStreamSource(stream);
+      src.connect(analyserNode);
+
+      let maxLevel = 0;
+      const samples = [];
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        const data = new Uint8Array(analyserNode.frequencyBinCount);
+        analyserNode.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0)/data.length;
+        samples.push(avg);
+        maxLevel = Math.max(maxLevel, avg);
+      }
+
+      stream.getTracks().forEach(t=>t.stop());
+      ctx.close();
+
+      const avgLevel = samples.reduce((a,b)=>a+b,0)/samples.length;
+      if (maxLevel < 1) {
+        setStatus('❌ マイク診断: 音声が検出されません。Macのシステム設定→サウンド→入力を確認してください', 'error');
+      } else if (avgLevel < 3) {
+        setStatus('⚠️ マイク診断: 音量が非常に小さいです。Macのシステム設定→サウンド→入力の音量を上げてください', 'error');
+      } else {
+        setStatus('✅ マイク診断OK: 音声レベル正常（avg:' + avgLevel.toFixed(1) + '）', 'success');
+      }
+    } catch(e) {
+      if (e.name === 'NotAllowedError') {
+        setStatus('❌ マイク診断: アクセス拒否。Chromeのアドレスバー左🔒→マイク→許可してリロード', 'error');
+      } else {
+        setStatus('❌ マイク診断エラー: ' + e.message, 'error');
+      }
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-stethoscope"></i> マイク診断';
+  }
+
+  function renderRecordings() {
+    const list = document.getElementById('recordings-list');
+    if (!recordings.length) { list.innerHTML = '<div class="empty-state">録音がまだありません</div>'; return; }
+    list.innerHTML = '';
+    recordings.forEach((rec, idx) => {
+      const ext = rec.mimeType.includes('ogg') ? 'ogg' : 'webm';
+      const item = document.createElement('div'); item.className = 'rec-item';
+      item.innerHTML = `
+        <div class="rec-item-info">
+          <div class="rec-item-name">${rec.name}</div>
+          <div class="rec-item-meta">${rec.dur} · ${ext.toUpperCase()}</div>
+        </div>
+        <div class="rec-item-actions">
+          <button class="icon-btn" onclick="playRec(${idx})" title="再生"><i class="ti ti-player-play"></i></button>
+          <button class="icon-btn" onclick="downloadRec(${idx})" title="ダウンロード"><i class="ti ti-download"></i></button>
+          <button class="icon-btn" onclick="deleteRec(${idx})" title="削除"><i class="ti ti-trash"></i></button>
+        </div>`;
+      list.appendChild(item);
+    });
+  }
+
+  function playRec(idx) { new Audio(recordings[idx].url).play(); setStatus('再生中: ' + recordings[idx].name, ''); }
+
+  function downloadRec(idx) {
+    const rec = recordings[idx];
+    const ext = rec.mimeType.includes('ogg') ? 'ogg' : 'webm';
+    const a = document.createElement('a'); a.href = rec.url; a.download = rec.name + '.' + ext; a.click();
+    setStatus('ダウンロード: ' + rec.name + '.' + ext, 'success');
+  }
+
+  function deleteRec(idx) { URL.revokeObjectURL(recordings[idx].url); recordings.splice(idx,1); renderRecordings(); }
+</script>
+</body>
+</html>
